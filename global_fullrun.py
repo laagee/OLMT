@@ -65,6 +65,10 @@ parser.add_option("--notrans", action="store_true", dest="notrans", default=Fals
                   help='Do not perform transient simulation (spinup only)')
 parser.add_option("--nopointdata", action="store_true", dest="nopointdata", \
                   default=False, help="do not generate point data")
+parser.add_option("--makepointdata_only", action="store_true", \
+                  dest="makepointdata_only", \
+                  help="make point data for later use ONLY, i.e. no model build/run)", \
+                  default=False)
 parser.add_option("--nyears_final_spinup", dest="nyears_final_spinup", default='200', \
                   help="base no. of years for final spinup")
 parser.add_option("--parm_list", dest="parm_list", default='parm_list', \
@@ -441,6 +445,8 @@ if (mycaseid != ''):
     basecmd = basecmd+' --caseidprefix '+mycaseid
 if (options.nopointdata):
     basecmd = basecmd+' --nopointdata'
+if (options.makepointdata_only):
+    basecmd = basecmd+' --makepointdata_only'
 if (options.project != ''):
     basecmd = basecmd+' --project '+options.project
 if (options.parm_vals != ''):
