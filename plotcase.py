@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import os, sys, csv, glob
-import numpy, scipy
+import numpy, scipy, math
 from scipy.io import netcdf
 from optparse import OptionParser
 import matplotlib as mpl
@@ -90,14 +90,18 @@ parser.add_option("--ylog", dest="ylog", help="log scale for Y axis", \
                   action="store_true", default=False)
 parser.add_option("--pdf", dest="pdf", help="save plot to pdf", \
                   action="store_true", default=False)
+parser.add_option("--png", dest="png", help="save plot to png", \
+                  action="store_true", default=False)
 parser.add_option("--noplot", dest="noplot", help="Do not make plots", \
                   action="store_true", default=False)
+parser.add_option("--nperpage", dest="nperpage", default=1, \
+                  help = 'number of plots per page')
 (options,args) = parser.parse_args()
                
 
 cesmdir=os.path.abspath(options.mycsmdir)                 
 
-if (options.pdf):
+if (options.pdf or options.png):
     mpl.use('Agg')	
 import matplotlib.pyplot as plt
 
@@ -365,7 +369,7 @@ for c in range(0,ncases):
                         if (y == ystart and m == 0 and c == 0):
                             nffile = netcdf.netcdf_file(myfile,"r")
                             varout=nffile.variables[myvars[v]]
-                            var_long_names.append(varout.long_name)
+                            var_long_names.append(varout.long_name.decode('utf_8'))
                             nffile.close()
                             if (float(options.scale_factor) < -900):
                                 if ('gC/m^2/s' in varout.units):
@@ -373,10 +377,10 @@ for c in range(0,ncases):
                                     var_units.append('g.C/m2/day')
                                 else:
                                     myscalefactors.append(1.0)
-                                    var_units.append(varout.units.replace('^',''))
+                                    var_units.append(varout.units.decode('utf_8').replace('^',''))
                             else:
                                 myscalefactors.append(float(options.scale_factor))
-                                var_units.append(varout.units.replace('^',''))
+                                var_units.append(varout.units.decode('utf_8').replace('^',''))
                         
                         if (y == ystart and m == 0 and v == 0):      # get lat/lon info
                             nffile = netcdf.netcdf_file(myfile,"r")
@@ -404,7 +408,7 @@ for c in range(0,ncases):
     if (ftype == 'custom'):
         for v in range(0,nvar):
             nsteps=0
-            nfiles = (yend-ystart)/nypf
+            nfiles = int((yend-ystart)/nypf)
             nc=1
             starti=0
             ylast=0
@@ -450,9 +454,9 @@ for c in range(0,ncases):
                         if (y == starti and n == 0 and c == 0):
                             nffile = netcdf.netcdf_file(myfile,"r")
                             varout=nffile.variables[myvars[v]]
-                            var_long_names.append(varout.long_name)
+                            var_long_names.append(varout.long_name.decode('utf_8'))
                             if (float(options.scale_factor) < -900):
-                                if ('gC/m^2/s' in varout.units):
+                                if ('gC/m^2/s' in varout.units.decode('utf_8')):
                                     if (npf >= 365):
                                         myscalefactors.append(3600*24)
                                         var_units.append('g.C/m2/day')
@@ -461,10 +465,10 @@ for c in range(0,ncases):
                                         var_units.append('g.C/m2/yr')
                                 else:
                                     myscalefactors.append(1.0)
-                                    var_units.append(varout.units.replace('^',''))
+                                    var_units.append(varout.units.decode('utf_8').replace('^',''))
                             else:
                                  myscalefactors.append(float(options.scale_factor))
-                                 var_units.append(varout.units.replace('^',''))
+                                 var_units.append(varout.units.decode('utf_8').replace('^',''))
                             nffile.close()
                         if (y == starti and n == 0 and v == 0):      # get lat/lon info
                             nffile = netcdf.netcdf_file(myfile,"r")
@@ -587,10 +591,23 @@ rmse = numpy.zeros([len(myvars),ncases],numpy.float)
 bias = numpy.zeros([len(myvars),ncases],numpy.float)
 corr = numpy.zeros([len(myvars),ncases],numpy.float)
 
+options.nperpage=int(options.nperpage)
+if (options.nperpage > 1):
+  nrow = 2
+  ncol = int(math.ceil(options.nperpage/2))
+else:
+  ncol = 1
+  nrow = 1
+
 for v in range(0,len(myvars)):
     if (not options.noplot):
-        fig = plt.figure()
-        ax = plt.subplot(111)
+        if (v % options.nperpage == 0):
+          fig = plt.figure(figsize=(11,8.5))
+        thisfig = v % options.nperpage+1
+        fignum = v/options.nperpage
+        thiscol = (thisfig -1) % ncol
+        thisrow = (thisfig -1) / ncol
+        ax = plt.subplot(nrow*100+ncol*10+thisfig)
     colors=['b','g','r','c','m','y','k','b','g','r','c','m','y','k','b','g','r','c','m','y','k']
     styles=['-','-','-','-','-','-','-','--','--','--','--','--','--','--','-.','-.','-.','-.','-.','-.','-.']
     for c in range(0,ncases):
@@ -619,7 +636,7 @@ for v in range(0,len(myvars)):
                     mytime[:] = (x_toplot[0,0:snum[c]]-ystart)*365
                     #myname = outdata.createVariable('site_name','c',('lat','lon','strlen'))
                     myname = outdata.createVariable('site_name','c',('gridcell','strlen'))
-                    myname[:,:] = ''   #changed for gridcell
+                    myname[:,:] = ' '   #changed for gridcell
                     outdata.close()
         for ftype in range(0,2):
             outdata = netcdf.netcdf_file('./plots/'+mycases[0]+'/'+analysis_type+'/'+mycases[0]+"_"+mysites[0]+'_'+ftype_suffix[ftype]+".nc","a",mmap=False)
@@ -673,26 +690,32 @@ for v in range(0,len(myvars)):
                                 color=colors[c], fmt='o')
 
     if (options.noplot == False):
-        if (avtype == 'seasonal'):
+        if (thisrow+1 == nrow):
+          if (avtype == 'seasonal'):
             plt.xlabel('Model Month')
-        elif (avtype == 'diurnal'):
+          elif (avtype == 'diurnal'):
             plt.xlabel('Model Hour (LST)')
-        else:
+          else:
             plt.xlabel('Model Year')
  
         plt.ylabel(myvars[v]+' ('+var_units[v]+')')
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size': 10})
-        plt.title(var_long_names[v]+' at '+mysites[0])
+        if (v % options.nperpage == options.nperpage-1):
+          ax.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size': 10})
+        plt.title(var_long_names[v]) #+' at '+mysites[0])
         if (options.ylog):
             plt.yscale('log')
 
         os.system('mkdir -p ./plots/'+mycases[0]+'/'+analysis_type)
+        if (options.nperpage == 1):
+          fig_filename = './plots/'+mycases[0]+'/'+analysis_type+'/'+mysites[0]+'_'+myvars[v]+'_'+analysis_type
+        else:
+          fig_filename = './plots/'+mycases[0]+'/'+analysis_type+'/'+mysites[0]+'_fig'+str(fignum)+'_'+analysis_type
         if (options.pdf):
-            fig_filename = './plots/'+mycases[0]+'/'+analysis_type+'/'+mysites[0]+'_'+myvars[v]
-            fig_filename = fig_filename+'_'+analysis_type
             fig.savefig(fig_filename+'.pdf')
+        if (options.png):
+            fig.savefig(fig_filename+'.png')
 
-if (not options.pdf and not options.noplot):
+if (not options.pdf and not options.noplot and not options.png):
     plt.show()
